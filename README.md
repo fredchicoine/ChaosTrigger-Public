@@ -16,6 +16,8 @@ VST3 · AU · Standalone. For Windows and macOS.
 
 </div>
 
+<p align="center"><img src="docs/screenshot.png" alt="Chaos Trigger" width="900"></p>
+
 ---
 
 ## Contents
