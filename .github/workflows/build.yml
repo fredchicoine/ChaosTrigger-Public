@@ -1,0 +1,73 @@
+name: Build Chaos Trigger
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: "Version to release (e.g. v0.1.0). Leave empty for a test build."
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: Mac
+            targets: ChaosTrigger_VST3 ChaosTrigger_AU ChaosTrigger_Standalone
+            extra: -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0
+          - os: windows-latest
+            name: Windows
+            targets: ChaosTrigger_VST3 ChaosTrigger_Standalone
+            extra: ""
+    runs-on: ${{ matrix.os }}
+    env:
+      CT_VERSION: ${{ inputs.release_version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || '0.1.0' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get JUCE
+        run: git clone --depth 1 -b 8.0.4 https://github.com/juce-framework/JUCE JUCE
+      - name: Configure
+        shell: bash
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release ${{ matrix.extra }}
+      - name: Build
+        shell: bash
+        run: |
+          for t in ${{ matrix.targets }}; do
+            cmake --build build --config Release --target $t --parallel 4
+          done
+      - name: Make Mac installer
+        if: matrix.name == 'Mac'
+        run: CT_VERSION="${CT_VERSION#v}" installer/mac/build-pkg.sh
+      - name: Make Windows installer
+        if: matrix.name == 'Windows'
+        shell: pwsh
+        run: |
+          $env:CT_VERSION = $env:CT_VERSION.TrimStart('v')
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" installer\windows.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChaosTrigger-${{ matrix.name }}-Installer
+          path: installer-out/*
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_version || github.ref_name }}
+          target_commitish: ${{ github.sha }}
+          name: Chaos Trigger ${{ inputs.release_version || github.ref_name }}
+          body: |
+            **Download the installer for your system below.**
+            - **Windows:** the `Windows-Setup.exe` installs the VST3 and the standalone app. If SmartScreen warns, click *More info → Run anyway*.
+            - **Mac:** the `.pkg` installs VST3, AU and the standalone app on Apple Silicon and Intel Macs. If macOS blocks it, right-click the .pkg and choose *Open*.
+
+            Rescan plugins in your DAW after installing.
+          files: installer-out/*
