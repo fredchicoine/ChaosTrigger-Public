@@ -201,6 +201,16 @@ Choose one of **24 patterns**, every possible order of the four lanes:
 by itself, without you changing the pattern. Each cycle still plays every lane exactly once, but in a new order each time.
 The **NOW:** line under the buttons shows the pattern that's actually playing.
 
+### Master Envelope
+
+The **MASTER ENVELOPE** knobs (**A D S R**, under the Chaos Picker) shape the **whole sound from the moment you press a key**, on top of
+each lane's own envelope:
+- **A**ttack: fade in when you press the key (0 = instant).
+- **D**ecay / **S**ustain: the level drops to Sustain while you hold the key.
+- **R**elease: when you let go, the sequence **keeps running** and fades out over the Release time. Use long releases for tails and short ones for tight stops.
+
+The lane envelopes shape every *slice*, and the master envelope shapes the *whole note*.
+
 **Using 2 or 3 lanes:** turn a lane's **POWER** off, or leave it empty, and the sequencer **skips it**.
 For example, pattern 1 (1234) with lane 3 off plays 1 → 2 → 4 → 1 → 2 → 4…
 
@@ -312,9 +322,9 @@ The master section is applied to each output.
 
 ## Automation
 
-**Every knob, button and selector can be automated** (79 parameters). Automation lanes use the same names as the controls on the panel:
+**Every knob, button and selector can be automated** (83 parameters). Automation lanes use the same names as the controls on the panel:
 
-- `PITCH`, `RETRIG / LEGATO`, `SYNC / FREE`, `FREE RATE (Hz)`, `CHAOS DIVIDER`, `CHAOS DIVIDER FEEL`, `SWING AMOUNT`, `CHAOS PICKER`, `BANK SCROLL`, `KEY TRACK`
+- `PITCH`, `RETRIG / LEGATO`, `SYNC / FREE`, `FREE RATE (Hz)`, `CHAOS DIVIDER`, `CHAOS DIVIDER FEEL`, `SWING AMOUNT`, `CHAOS PICKER`, `BANK SCROLL`, `KEY TRACK`, `MASTER ENV A/D/S/R`
 - `MASTER DIST`, `MASTER HAAS (ms)`, `MASTER CRUSH (bits)`, `MASTER SMASH`, `MASTER RING MOD`, `MASTER RING HZ`, `MASTER FILTER`, `MASTER CUTOFF`, `MASTER RES`
 - For each lane: `LANE 1 A (Attack)`, `LANE 1 D (Decay)`, `LANE 1 S (Sustain)`, `LANE 1 R (Release)`, `LANE 1 PITCH`, `LANE 1 PAN`, `LANE 1 VOL (dB)`, `LANE 1 POWER`, `LANE 1 MONO`, `LANE 1 REVERSE`, `LANE 1 DIST`, `LANE 1 HAAS (ms)`, `LANE 1 CRUSH (bits)`, `LANE 1 SMASH`, `LANE 1 CHORUS`, and the same for lanes 2–4
 
@@ -345,9 +355,13 @@ The only thing that can't be automated is *which audio file* is loaded in a lane
 
 ## Troubleshooting / FAQ
 
+**The plugin window is cut off / too big for my screen.**
+Drag the plugin window's bottom-right corner to resize it. The whole panel scales and keeps its proportions, so nothing gets cut off.
+It opens at a size that fits your screen.
+
 **I hear nothing.**
 Check that a sample is loaded, that the lane's **POWER** is on, that its **VOL** isn't at the minimum, and that you're **holding a MIDI note**.
-Also check the **S (Sustain)** knob: if it's at 0, the sound fades out after the Decay.
+Also check the lanes' **S (Sustain)** knob and the **MASTER ENVELOPE S**: if one of them is at 0, the sound fades out after the Decay.
 
 **It doesn't follow my DAW tempo.**
 Make sure **SYNC** is lit (not FREE). SYNC only sets the *step speed*. The loops themselves aren't time-stretched, so prepare them at your project tempo.
