@@ -159,8 +159,8 @@ static void setupKnob (juce::Slider& s, juce::Colour c, bool textBox = false)
     s.getProperties().set ("knobColour", (int) c.getARGB());
 }
 
-ChaosTriggerEditor::ChaosTriggerEditor (ChaosTriggerProcessor& p)
-    : AudioProcessorEditor (p), proc (p),
+ChaosPanel::ChaosPanel (ChaosTriggerProcessor& p)
+    : proc (p),
       keyboard (p.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     setLookAndFeel (&lnf);
@@ -262,6 +262,8 @@ ChaosTriggerEditor::ChaosTriggerEditor (ChaosTriggerProcessor& p)
     mk (mCrush, "m_crush", col::red); mk (mSmash, "m_smash", col::red);
     mk (ringHz, "m_ringHz", juce::Colour (0xff888888));
     mk (cutoff, "m_cutoff", col::red); mk (res, "m_res", col::red);
+    label (envTitle, "MASTER ENVELOPE", 13);
+    mk (mA, "m_a", col::red); mk (mD, "m_d", col::red); mk (mS, "m_s", col::red); mk (mR, "m_r", col::red);
     ringBtn.setClickingTogglesState (true);
     addAndMakeVisible (ringBtn);
     ringAtt = std::make_unique<BA> (proc.apvts, "m_ring", ringBtn);
@@ -335,15 +337,13 @@ ChaosTriggerEditor::ChaosTriggerEditor (ChaosTriggerProcessor& p)
         addAndMakeVisible (L.chorus);
     }
 
-    setResizable (true, true);
-    setResizeLimits (1100, 840, 2400, 1700);
-    setSize (1400, 1010);
+    setSize (kDesignW, kDesignH);
     startTimerHz (30);
 }
 
-ChaosTriggerEditor::~ChaosTriggerEditor() { setLookAndFeel (nullptr); }
+ChaosPanel::~ChaosPanel() { setLookAndFeel (nullptr); }
 
-void ChaosTriggerEditor::setParam (const juce::String& id, float plain)
+void ChaosPanel::setParam (const juce::String& id, float plain)
 {
     if (auto* prm = proc.apvts.getParameter (id))
     {
@@ -353,7 +353,7 @@ void ChaosTriggerEditor::setParam (const juce::String& id, float plain)
     }
 }
 
-void ChaosTriggerEditor::loadForLane (int lane)
+void ChaosPanel::loadForLane (int lane)
 {
     chooser = std::make_unique<juce::FileChooser> ("Load sample for lane " + juce::String (lane + 1),
                                                    juce::File(), "*.wav;*.aif;*.aiff;*.flac;*.ogg;*.mp3");
@@ -365,7 +365,7 @@ void ChaosTriggerEditor::loadForLane (int lane)
         });
 }
 
-void ChaosTriggerEditor::timerCallback()
+void ChaosPanel::timerCallback()
 {
     // Keep computer-keyboard playing available unless the user is typing somewhere else.
     if (isShowing() && juce::Component::getCurrentlyFocusedComponent() == nullptr)
@@ -411,7 +411,7 @@ void ChaosTriggerEditor::timerCallback()
     }
 }
 
-void ChaosTriggerEditor::paint (juce::Graphics& g)
+void ChaosPanel::paint (juce::Graphics& g)
 {
     g.fillAll (col::bg);
     auto b = getLocalBounds().toFloat();
@@ -458,11 +458,19 @@ void ChaosTriggerEditor::paint (juce::Graphics& g)
         g.setColour (col::red.withAlpha (0.5f));
         g.drawRoundedRectangle (band.toFloat(), 6, 1.2f);
     }
+    {
+        const char* et[] = { "A", "D", "S", "R" };
+        juce::Slider* es[] = { &mA, &mD, &mS, &mR };
+        g.setColour (col::text);
+        g.setFont (juce::FontOptions (12.0f, juce::Font::bold));
+        for (int k = 0; k < 4; ++k)
+            g.drawText (et[k], es[k]->getBounds().withY (es[k]->getBottom()).withHeight (14), juce::Justification::centred);
+    }
     g.setColour (col::text.withAlpha (0.4f));
     g.drawVerticalLine (pickerTitle.getX() - 12, 10.0f, (float) loadBtn.getBottom());
 }
 
-void ChaosTriggerEditor::resized()
+void ChaosPanel::resized()
 {
     auto area = getLocalBounds().reduced (14);
     {
@@ -526,10 +534,18 @@ void ChaosTriggerEditor::resized()
     }
     right.removeFromTop (6);
     nowPlaying.setBounds (right.removeFromTop (22));
+    right.removeFromTop (4);
+    envTitle.setBounds (right.removeFromTop (16));
+    {
+        auto er = right.removeFromTop (right.getHeight() - 14);
+        const int kw = er.getWidth() / 4, kh = juce::jmin (er.getHeight(), kw);
+        juce::Slider* es[] = { &mA, &mD, &mS, &mR };
+        for (auto* s : es) s->setBounds (er.removeFromLeft (kw).withSizeKeepingCentre (kh, kh));
+    }
 
     // ---- master FX band -----------------------------------------------------
     area.removeFromTop (6);
-    auto mb = area.removeFromTop (juce::roundToInt (getHeight() * 0.10f)).reduced (6, 2);
+    auto mb = area.removeFromTop (juce::roundToInt (kDesignH * 0.10f)).reduced (6, 2);
     masterTitle.setBounds (mb.removeFromLeft (90));
     const int mh = mb.getHeight() - 16;
     juce::Slider* fx4[] = { &mDist, &mHaas, &mCrush, &mSmash };
@@ -576,4 +592,31 @@ void ChaosTriggerEditor::resized()
         for (int k = 0; k < 7; ++k)
             ks6[k]->setBounds (juce::Rectangle<int> (row.getX() + k * colW + k / 4 * 8, row.getY(), colW, ks + 0).withSizeKeepingCentre (ks, ks));
     }
+}
+
+//==============================================================================
+ChaosTriggerEditor::ChaosTriggerEditor (ChaosTriggerProcessor& p)
+    : AudioProcessorEditor (p), panel (p)
+{
+    addAndMakeVisible (panel);
+    // The panel keeps its proportions and scales to any window size, so nothing gets cut off
+    // when the host's plugin window is smaller than the design size (e.g. Reaper's FX window).
+    setResizable (true, true);
+    if (auto* c = getConstrainer())
+    {
+        c->setFixedAspectRatio ((double) kDesignW / kDesignH);
+        c->setSizeLimits (kDesignW / 3, kDesignH / 3, kDesignW * 2, kDesignH * 2);
+    }
+    // Open at a size that fits the screen (max 85% of the usable area).
+    double scale = 1.0;
+    if (auto* d = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+        scale = juce::jmin (1.0, d->userArea.getWidth() * 0.85 / kDesignW, d->userArea.getHeight() * 0.85 / kDesignH);
+    setSize (juce::roundToInt (kDesignW * scale), juce::roundToInt (kDesignH * scale));
+}
+
+void ChaosTriggerEditor::resized()
+{
+    const float s = juce::jmin (getWidth() / (float) kDesignW, getHeight() / (float) kDesignH);
+    panel.setTransform (juce::AffineTransform::scale (s));
+    panel.setTopLeftPosition (0, 0);
 }

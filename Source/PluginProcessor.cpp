@@ -40,6 +40,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout ChaosTriggerProcessor::creat
         l.add (std::make_unique<AudioParameterFloat>(ParameterID { pre + "smash", 1 }, n + "SMASH", NormalisableRange<float> (0, 1), 0.0f));
     };
     addFx ("m_", "MASTER ");
+    {
+        NormalisableRange<float> t (0.0f, 8.0f, 0.001f, 0.3f);
+        l.add (std::make_unique<AudioParameterFloat>(ParameterID { "m_a", 1 }, "MASTER ENV A (Attack)",  t, 0.001f));
+        l.add (std::make_unique<AudioParameterFloat>(ParameterID { "m_d", 1 }, "MASTER ENV D (Decay)",   t, 0.1f));
+        l.add (std::make_unique<AudioParameterFloat>(ParameterID { "m_s", 1 }, "MASTER ENV S (Sustain)", NormalisableRange<float> (0, 1), 1.0f));
+        l.add (std::make_unique<AudioParameterFloat>(ParameterID { "m_r", 1 }, "MASTER ENV R (Release)", t, 0.05f));
+    }
     l.add (std::make_unique<AudioParameterBool> (ParameterID { "m_ring", 1 }, "MASTER RING MOD", false, AudioParameterBoolAttributes().withStringFromValueFunction ([] (bool v, int) { return String (v ? "ON" : "OFF"); })));
     l.add (std::make_unique<AudioParameterFloat>(ParameterID { "m_ringHz", 1 }, "MASTER RING HZ",
                                                  NormalisableRange<float> (20.0f, 4000.0f, 0.1f, 0.3f), 440.0f));
@@ -109,6 +116,8 @@ void ChaosTriggerProcessor::prepareToPlay (double sampleRate, int samplesPerBloc
     for (int i = 0; i < kNumLanes; ++i)
     {
         env[(size_t) i].setSampleRate (sr);
+        masterEnv.setSampleRate (sr);
+        masterEnv.reset();
         env[(size_t) i].reset();
         gainL[(size_t) i].reset (sr, 0.02);
         gainR[(size_t) i].reset (sr, 0.02);
@@ -337,7 +346,16 @@ void ChaosTriggerProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
                 const bool first = heldNotes == 0;
                 ++heldNotes;
                 if (first || ! legato)
+                {
                     startNote (! legato || ! running);
+                    juce::ADSR::Parameters mp;
+                    mp.attack  = apvts.getRawParameterValue ("m_a")->load();
+                    mp.decay   = apvts.getRawParameterValue ("m_d")->load();
+                    mp.sustain = apvts.getRawParameterValue ("m_s")->load();
+                    mp.release = apvts.getRawParameterValue ("m_r")->load();
+                    masterEnv.setParameters (mp);
+                    masterEnv.noteOn();
+                }
                 else
                 {   // legato: restart step sequencer only
                     stepIndex = 0; stepCount = 0; samplesToNextStep = 0.0;
@@ -347,16 +365,13 @@ void ChaosTriggerProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
             {
                 heldNotes = juce::jmax (0, heldNotes - 1);
                 if (heldNotes == 0)
-                {
-                    for (auto& e : env) e.noteOff();
-                    currentLane = -1;
-                    activeLane = -1;
-                }
+                    masterEnv.noteOff();   // the sequence keeps running through the master release
             }
             else if (m.isAllNotesOff() || m.isAllSoundOff())
             {
                 heldNotes = 0;
                 for (auto& e : env) e.reset();
+                masterEnv.reset();
                 running = false; currentLane = -1; activeLane = -1;
             }
         }
@@ -364,14 +379,14 @@ void ChaosTriggerProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         const double noteRatio = keyTrack ? std::pow (2.0, (currentNote - 60) / 12.0) : 1.0;
         if (! running) continue;
 
-        if (heldNotes > 0)
+        if (heldNotes > 0 || masterEnv.isActive())
         {
             samplesToNextStep -= 1.0;
             if (samplesToNextStep <= 0.0)
                 advanceStep();
         }
 
-        bool anyActive = heldNotes > 0;
+        bool anyActive = heldNotes > 0 || masterEnv.isActive();
         for (int i = 0; i < kNumLanes; ++i)
         {
             const auto& s = smp[(size_t) i];
@@ -433,6 +448,16 @@ void ChaosTriggerProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
             grains[(size_t) i].phase += inc / (grainLenSec * s->sampleRate);
             if (grains[(size_t) i].phase >= 1.0) grains[(size_t) i].phase -= 1.0;
             if (pos >= len) { pos = std::fmod (pos, (double) len); for (auto& a : grains[(size_t) i].anchor) a -= len; }
+        }
+        // MASTER ENVELOPE: direct amplitude control from the key press, on top of the lane gates.
+        const float mg = masterEnv.isActive() ? masterEnv.getNextSample() : 0.0f;
+        for (int ch = 0; ch < kNumLanes * 2; ++ch)
+            laneBuf.getWritePointer (ch)[n] *= mg;
+        if (heldNotes == 0 && ! masterEnv.isActive())
+        {
+            for (auto& e : env) e.reset();
+            currentLane = -1; activeLane = -1;
+            anyActive = false;
         }
         if (! anyActive) running = false;
     }

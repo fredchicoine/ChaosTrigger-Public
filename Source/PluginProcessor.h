@@ -84,6 +84,7 @@ private:
 
     double sr = 44100.0;
     std::array<juce::ADSR, kNumLanes> env;
+    juce::ADSR masterEnv;
     std::array<double, kNumLanes> lanePos {};      // read position in source samples
     std::array<juce::SmoothedValue<float>, kNumLanes> gainL, gainR;
 

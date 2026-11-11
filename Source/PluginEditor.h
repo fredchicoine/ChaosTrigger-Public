@@ -43,11 +43,13 @@ struct LaneStrip
     std::vector<std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment>> bAtt;
 };
 
-class ChaosTriggerEditor : public juce::AudioProcessorEditor, private juce::Timer
+// The whole panel, laid out at a fixed design size (kDesignW x kDesignH).
+// ChaosTriggerEditor scales it to whatever window size the host gives.
+class ChaosPanel : public juce::Component, private juce::Timer
 {
 public:
-    explicit ChaosTriggerEditor (ChaosTriggerProcessor&);
-    ~ChaosTriggerEditor() override;
+    explicit ChaosPanel (ChaosTriggerProcessor&);
+    ~ChaosPanel() override;
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -66,7 +68,8 @@ private:
     juce::OwnedArray<juce::TextButton> divBtns, feelBtns;
     juce::ComboBox pattern;
     juce::TextButton randoom { "RANDOOM" }, loadBtn { "LOAD SAMPLE" }, scrollBtn { "BANK SCROLL" };
-    juce::Label nowPlaying;
+    juce::Label nowPlaying, envTitle;
+    juce::Slider mA, mD, mS, mR;
     juce::MidiKeyboardComponent keyboard;
     juce::TextButton keyTrackBtn { "KEY TRACK" };
     std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> keyTrackAtt;
@@ -85,5 +88,18 @@ private:
     std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> patAtt;
     std::unique_ptr<juce::FileChooser> chooser;
 
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChaosPanel)
+};
+
+static constexpr int kDesignW = 1400, kDesignH = 1010;
+
+class ChaosTriggerEditor : public juce::AudioProcessorEditor
+{
+public:
+    explicit ChaosTriggerEditor (ChaosTriggerProcessor&);
+    void resized() override;
+    void paint (juce::Graphics& g) override { g.fillAll (juce::Colours::black); }
+private:
+    ChaosPanel panel;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ChaosTriggerEditor)
 };

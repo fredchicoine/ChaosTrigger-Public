@@ -118,7 +118,7 @@ int main (int argc, char** argv)
         }
     }
     std::unique_ptr<juce::AudioProcessorEditor> ed (p.createEditor());
-    ed->setSize (1400, 920);
+    ed->setSize (900, 649);
     p.activeLane = 1;
     auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
     juce::PNGImageFormat png; juce::FileOutputStream os (dir.getChildFile ("gui.png"));
