@@ -123,5 +123,32 @@ int main (int argc, char** argv)
     auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
     juce::PNGImageFormat png; juce::FileOutputStream os (dir.getChildFile ("gui.png"));
     os.setPosition (0); os.truncate(); png.writeImageToStream (img, os);
+    // README screenshot: fresh instance with four example loops and a few settings.
+    {
+        ChaosTriggerProcessor q;
+        q.setPlayConfigDetails (0, 2, sr, bs);
+        q.prepareToPlay (sr, bs);
+        const char* names[] = { "Drums_150bpm.wav", "Hats_150bpm.wav", "Bass_150bpm.wav", "Pad_150bpm.wav" };
+        for (int l = 0; l < 4; ++l)
+        {
+            auto src = dir.getChildFile ("Amen Break Lane " + juce::String (l + 1) + " 150bpm.wav");
+            auto dst = dir.getChildFile (names[l]);
+            src.copyFileTo (dst);
+            q.loadSample (l, dst);
+        }
+        auto set = [&q] (const char* id, float plain) { auto* pr = q.apvts.getParameter (id); pr->setValueNotifyingHost (pr->convertTo0to1 (plain)); };
+        set ("pattern", 1); set ("m_fmode", 1); set ("m_cutoff", 6000); set ("m_res", 0.3f);
+        set ("l2_chorus", 1); set ("l3_rev", 1); set ("l4_mono", 1); set ("l1_dist", 0.3f); set ("l3_crush", 12);
+        set ("l2_pitch", 7); set ("l4_pitch", -5); set ("m_r", 0.6f); set ("m_a", 0.02f);
+        juce::MidiBuffer m; m.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 100), 0);
+        for (int blk = 0; blk < 30; ++blk) { q.processBlock (buf, m); m.clear(); }
+        q.keyboardState.noteOn (1, 60, 1.0f);
+        std::unique_ptr<juce::AudioProcessorEditor> qe (q.createEditor());
+        qe->setSize (kDesignW, kDesignH);
+        if (auto* panel = dynamic_cast<ChaosPanel*> (qe->getChildComponent (0))) panel->refresh();
+        auto shot = qe->createComponentSnapshot (qe->getLocalBounds(), true, 1.0f);
+        juce::PNGImageFormat png2; juce::FileOutputStream os2 (dir.getChildFile ("screenshot.png"));
+        os2.setPosition (0); os2.truncate(); png2.writeImageToStream (shot, os2);
+    }
     return (peak > 0.01f && ! nan && lanesSeen.size() >= 4) ? 0 : 2;
 }

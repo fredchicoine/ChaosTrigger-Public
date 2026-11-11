@@ -49,6 +49,7 @@ class ChaosPanel : public juce::Component, private juce::Timer
 {
 public:
     explicit ChaosPanel (ChaosTriggerProcessor&);
+    void refresh() { timerCallback(); }   // pull the latest state into the controls now
     ~ChaosPanel() override;
     void paint (juce::Graphics&) override;
     void resized() override;
